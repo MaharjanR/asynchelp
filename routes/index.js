@@ -15,27 +15,31 @@ router.get('/ping', ((req, res) => {
 
 }));
 
-//setting up an aray to store the data from API calls
-let dict = {};
-
 // when uri is /posts this gets run
 router.get('/posts', (req,res) => {
    
+    //setting up a dictionary to store the data from API calls
+    let dict = {};
     let posts;
+
     //stores the query after posts?
     const query = req.query;
+    const tags = query.tags;
     const sortBy = query.sortBy;
     const direction = query.direction;
 
+
     // checks if there is a tags query in the uri or not
-    if(query.tags){
+    if(tags){
         // splitting the tags from queries after each comma to fetch individual data and storing in tags variable
-        let tags = query.tags.split(',');
+        const tagsArr = tags.split(',');
+        let tagsLength = tagsArr.length;
+        console.log(tagsLength);
 
         // try catch block to catch errors if thrown
         try{
             // loops through each tags to make an individual api calls
-            tags.forEach(async (element) => {
+            tagsArr.forEach(async (element) => {
                 // stores the data from api and turns it into json
                 let data = await fetch(`https://hatchways.io/api/assessment/blog/posts?tag=${element}`);    
                 let dataJson = await data.json();
@@ -43,8 +47,37 @@ router.get('/posts', (req,res) => {
                 dataJson.posts.forEach(el => {
                     dict[el.id] = el;
                 });
-                
-                posts = groupBy(dict);
+                tagsLength--;
+                if(tagsLength == 0){
+                    if( sortBy && direction){
+                        if(sortBy == 'id' || sortBy == 'likes' || sortBy == 'popularity' || sortBy == 'reads'){
+                            if(direction == 'asc' || direction == 'desc'){
+                                posts = groupBy(dict, sortBy, direction);
+                            }
+                        }
+                    }
+                    else if(sortBy){
+                        if(sortBy == 'id' || sortBy == 'likes' || sortBy == 'popularity' || sortBy == 'reads'){
+                            posts = groupBy(dict, sortBy);
+                        }
+                        else{
+                            res.status(400).json({ error: "sortBy parameter is invalid"})
+                        }
+                    }
+                    else if(direction){
+                        if(direction == 'asc' || direction == 'desc'){
+                            posts = groupBy(dict, 'id', direction);
+                        }
+                        else{
+                            res.status(400).json({ error: "direction parameter is invalid"})
+                        }
+                    }
+                    else{
+                        posts = groupBy(dict);
+                    }
+                    res.status(200).json({posts});
+                }
+               
 
             });
 
@@ -53,31 +86,6 @@ router.get('/posts', (req,res) => {
             console.log(err);
         }
 
-        if( sortBy && direction){
-            if(sortBy == 'id' || sortBy == 'likes' || sortBy == 'popularity' || sortBy == 'reads'){
-                if(direction == 'asc' || direction == 'desc'){
-                    posts = groupBy(dict, sortBy, direction);
-                }
-            }
-        }
-        if(sortBy){
-            if(sortBy == 'id' || sortBy == 'likes' || sortBy == 'popularity' || sortBy == 'reads'){
-                posts = groupBy(dict, sortBy);
-            }
-            else{
-                res.status(400).json({ error: "sortBy parameter is invalid"})
-            }
-        }
-        if(direction){
-            if(direction == 'asc' || direction == 'desc'){
-                posts = groupBy(dict, 'id', direction);
-            }
-            else{
-                res.status(400).json({ error: "direction parameter is invalid"})
-            }
-        }
-        
-        res.status(200).json({posts});
     }
 
     // if no tags exist on query throw an error as it is mandatory
@@ -89,7 +97,7 @@ router.get('/posts', (req,res) => {
 
 /**
 * Sorts out the dictionary and returns it in array
-* @param (string, dictionary, string) sortby - sort by what values(will default to id if no value present), dict - dictonary that needs to be sorted
+* @param (string, dictionary, string) sortby - sort by what values(id by default), dict - dictonary that needs to be sorted, direction - do they want it asc or desc( asc by default)
 * 
 */
 function groupBy(dict, sortBy = 'id', direction = 'asc' ) {
