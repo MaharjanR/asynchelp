@@ -1,7 +1,10 @@
 'use strict';
 
 const express = require('express');
-const fetch = require("node-fetch");
+const cache = require('express-redis-cache')();
+const fetch = require('node-fetch');
+const validator = require('./validator')
+const { validationResult } = require('express-validator');
 
 const router = express.Router();
 
@@ -16,83 +19,81 @@ router.get('/ping', ((req, res) => {
 }));
 
 // when uri is /posts this gets run
-router.get('/posts', (req,res) => {
+router.get('/posts', cache.route(), validator.queryValidate, (req,res) => {
+
+    const errors = validationResult(req);
+    console.log('Lets see if it runs ');
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ "errors": errors.array()[0].msg });
+      }
    
     //setting up a dictionary to store the data from API calls
     let dict = {};
     let posts;
 
     //stores the query after posts?
-    const query = req.query;
-    const tags = query.tags;
-    const sortBy = query.sortBy;
-    const direction = query.direction;
+    const { query } = req;
+    const { tags } = query;
+    const { sortBy } = query;
+    const { direction } = query;
 
 
-    // checks if there is a tags query in the uri or not
-    if(tags){
-        // splitting the tags from queries after each comma to fetch individual data and storing in tags variable
-        const tagsArr = tags.split(',');
-        let tagsLength = tagsArr.length;
-        console.log(tagsLength);
+    console.log(query);
 
-        // try catch block to catch errors if thrown
-        try{
-            // loops through each tags to make an individual api calls
-            tagsArr.forEach(async (element) => {
-                // stores the data from api and turns it into json
-                let data = await fetch(`https://hatchways.io/api/assessment/blog/posts?tag=${element}`);    
-                let dataJson = await data.json();
-                // loops through the data post from and storing it in dict array
-                dataJson.posts.forEach(el => {
-                    dict[el.id] = el;
-                });
-                tagsLength--;
-                if(tagsLength == 0){
-                    if( sortBy && direction){
-                        if(sortBy == 'id' || sortBy == 'likes' || sortBy == 'popularity' || sortBy == 'reads'){
-                            if(direction == 'asc' || direction == 'desc'){
-                                posts = groupBy(dict, sortBy, direction);
-                            }
-                        }
-                    }
-                    else if(sortBy){
-                        if(sortBy == 'id' || sortBy == 'likes' || sortBy == 'popularity' || sortBy == 'reads'){
-                            posts = groupBy(dict, sortBy);
-                        }
-                        else{
-                            res.status(400).json({ error: "sortBy parameter is invalid"})
-                        }
-                    }
-                    else if(direction){
-                        if(direction == 'asc' || direction == 'desc'){
-                            posts = groupBy(dict, 'id', direction);
-                        }
-                        else{
-                            res.status(400).json({ error: "direction parameter is invalid"})
-                        }
-                    }
-                    else{
-                        posts = groupBy(dict);
-                    }
-                    res.status(200).json({posts});
-                }
-               
+    // splitting the tags from queries after each comma to fetch individual data and storing in tags variable
+    const tagsArr = tags.split(',');
+    let tagsLength = tagsArr.length;
 
+    // try catch block to catch errors if thrown
+    try{
+        // loops through each tags to make an individual api calls
+        tagsArr.forEach(async (element) => {
+            // stores the data from api and turns it into json
+            let data = await fetch(`https://hatchways.io/api/assessment/blog/posts?tag=${element}`);    
+            let dataJson = await data.json();
+            // loops through the data post from and storing it in dictonary
+            dataJson.posts.forEach(el => {
+                dict[el.id] = el;
             });
-
-        }
-        catch(err){
-            console.log(err);
-        }
-
+            tagsLength--;
+            if(tagsLength == 0){
+                if( sortBy && direction){
+                    posts = groupBy(dict, sortBy, direction);
+                }
+                else if(sortBy){
+                    posts = groupBy(dict, sortBy);
+                }
+                else if(direction){
+                    posts = groupBy(dict, 'id', direction);
+                }
+                else{
+                    posts = groupBy(dict);
+                }
+                res.status(200).json({posts});
+            }
+        });
     }
-
-    // if no tags exist on query throw an error as it is mandatory
-    else{
-        res.status(400).json({ error: "Tags parameter is required" } )
+    catch(err){
+        console.log(err);
     }
 })
+
+// function cache(req, res, next){
+
+//     const { query } = req.query;
+
+//     client.get(query, (err, data) => {
+//         if(err) throw err;
+
+//         if(data != null){
+//             res.send(setResponse(query, data));
+//         }
+//         else{
+//             next();
+//         }
+//     })
+
+// }
 
 
 /**
