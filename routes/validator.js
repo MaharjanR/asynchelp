@@ -1,9 +1,12 @@
 const { query } = require('express-validator');
 
+// validates the query tags
 exports.queryValidate = [
+    // validates the tags query
     query('tags', 'Tags parameter is required')
         .not()
         .isEmpty(),
+    // validates the sortby query
     query('sortBy')
         .custom( value => {
             if(value){
@@ -13,6 +16,7 @@ exports.queryValidate = [
             }
             return true;
         }),
+    // validates the direction query
     query('direction')
         .custom( value => {
             if(value){

@@ -7,8 +7,10 @@ chai.should();
 
 chai.use(chaiHttp);
 
+// testing the whole API
 describe('API testing', () => {
 
+    // test the ping
     describe('GET /api/ping', () => {
         it('It should test the ping', done =>{
             chai.request(server)
@@ -21,7 +23,9 @@ describe('API testing', () => {
         });
     });
 
+    // test the api/posts uri
     describe('GET /api/posts', () => {
+        
         it('It should test the complete uri', done =>{
             chai.request(server)
                 .get('/api/posts?tags=science&sortBy=likes&direction=desc')
@@ -46,7 +50,7 @@ describe('API testing', () => {
 
         it('It should test error of no tags', done =>{
             chai.request(server)
-                .get('/api/posts')
+                .get('/api/posts?tags=')
                 .end( (err, res) => {
                     res.should.have.status(400);
                     res.body.should.be.a('object');

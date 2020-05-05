@@ -1,14 +1,14 @@
 'use strict';
 
 const express = require('express');
-const cache = require('express-redis-cache')();
+const cache = require('express-redis-cache')({ expire: 30 });
 const fetch = require('node-fetch');
 const validator = require('./validator')
 const { validationResult } = require('express-validator');
 
 const router = express.Router();
 
-// when uri is api/ping
+// returns status 200 and object
 router.get('/ping', ((req, res) => {
 
     // it changes the status code to 200 and shows the json object to the user
@@ -18,16 +18,18 @@ router.get('/ping', ((req, res) => {
 
 }));
 
-// when uri is /posts this gets run
+// first middleware to save caching the url, second middleware to validate the query
 router.get('/posts', cache.route(), validator.queryValidate, (req,res) => {
 
+    // stores the validation errors
     const errors = validationResult(req);
-    console.log('Lets see if it runs ');
+
+    // if there is errors, display the errors
     if (!errors.isEmpty()) {
         return res.status(400).json({ "errors": errors.array()[0].msg });
-      }
+    }
    
-    //setting up a dictionary to store the data from API calls
+    // setting up a dictionary to store the data from API calls
     let dict = {};
     let posts;
 
@@ -37,14 +39,10 @@ router.get('/posts', cache.route(), validator.queryValidate, (req,res) => {
     const { sortBy } = query;
     const { direction } = query;
 
-
-    console.log(query);
-
-    // splitting the tags from queries after each comma to fetch individual data and storing in tags variable
+    // splitting the tags from queries and store in variable
     const tagsArr = tags.split(',');
     let tagsLength = tagsArr.length;
 
-    // try catch block to catch errors if thrown
     try{
         // loops through each tags to make an individual api calls
         tagsArr.forEach(async (element) => {
@@ -55,7 +53,10 @@ router.get('/posts', cache.route(), validator.queryValidate, (req,res) => {
             dataJson.posts.forEach(el => {
                 dict[el.id] = el;
             });
+
             tagsLength--;
+
+            // runs once all the api call is made
             if(tagsLength == 0){
                 if( sortBy && direction){
                     posts = groupBy(dict, sortBy, direction);
@@ -78,23 +79,6 @@ router.get('/posts', cache.route(), validator.queryValidate, (req,res) => {
     }
 })
 
-// function cache(req, res, next){
-
-//     const { query } = req.query;
-
-//     client.get(query, (err, data) => {
-//         if(err) throw err;
-
-//         if(data != null){
-//             res.send(setResponse(query, data));
-//         }
-//         else{
-//             next();
-//         }
-//     })
-
-// }
-
 
 /**
 * Sorts out the dictionary and returns it in array
@@ -103,10 +87,12 @@ router.get('/posts', cache.route(), validator.queryValidate, (req,res) => {
 */
 function groupBy(dict, sortBy = 'id', direction = 'asc' ) {
 
+    // stores all the data into an array
     let posts = [];
     for(let key in dict){
         posts.push(dict[key]);
     }
+    // sort out the datas
     if(direction == 'desc'){
         const sortPosts = posts.sort( (a,b) => b[sortBy] - a[sortBy]);
         return sortPosts;
